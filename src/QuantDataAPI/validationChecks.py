@@ -1,6 +1,15 @@
 from typing import Sequence, Any
 
 
+def validate_non_empty_string(name: str, value: Any) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{name} must be a string.")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{name} must be a non-empty string.")
+    return normalized
+
+
 def validate_enum(name: str, value: str, allowed: set[str]) -> str:
     normalized = value.upper()
     if normalized not in allowed:

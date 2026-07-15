@@ -2,9 +2,7 @@
 
 Unofficial Python client for the [QuantData.US API](https://quantdata.us/api).
 
-> 🔑 **[API key at QuantData.us →](https://quantdata.us/api#pricing)** · 📚 [API documentation](https://quantdata.us/api/docs/introduction) ·
-
-> **Work in progress:** This SDK is under active development. Endpoint interfaces and examples may change. Endpoint example blocks are intentionally empty until the interfaces are finalized.
+> [Get an API key](https://quantdata.us/api#pricing) · [API documentation](https://quantdata.us/api/docs/introduction)
 
 ```bash
 pip install quantdataus-api
@@ -17,7 +15,7 @@ from QuantDataAPI import QuantDataAPI_Client
 
 client = QuantDataAPI_Client(
     "YOUR_API_KEY",
-    output_type="Polars",
+    output_type="polars",
     timezone="America/New_York",
 )
 
@@ -27,234 +25,547 @@ data = client.get_dark_pool_levels(
 )
 ```
 
-### Timezone handling
+`output_type` accepts `"json"` (the default), `"pandas"`, or `"polars"`. Non-paginated endpoints return the service JSON unchanged in JSON mode and normalized rows with the documented columns in DataFrame modes. The six cursor-paginated endpoints support JSON only and return exactly one page per call.
 
-`timezone` accepts an [IANA timezone name](https://nodatime.org/TimeZones) and defaults to `America/New_York`. The
-SDK uses it to interpret naive input datetimes before converting them to UTC timestamps for API requests. It will
-convert the timestamps in response payloads unless `convertTimezone = False`.
+### Request and timezone rules
+
+`timezone` accepts an [IANA timezone name](https://nodatime.org/TimeZones) and defaults to `America/New_York`. The SDK interprets naive input datetimes in that timezone, sends UTC instants, and converts response timestamps back to that timezone unless `convertTimezone=False`. Datetime inputs accept the human-readable `YYYY-MM-DD HH:MM` format; for example, `2026-05-13 20:00` means 8 PM in the configured timezone. ISO-8601 strings and Python `datetime` values are also supported.
+
+Where supported, `sessionDate` and the `startTime`/`endTime` pair are mutually exclusive. Both time bounds are required together. Session or snapshot selectors are optional unless an endpoint says otherwise; omitting them asks QuantData for its latest available session or snapshot.
 
 ## Equity Features
 
 ### [Dark Flow](https://quantdata.us/api/docs/endpoints/dark-flow)
 
-Dark Flow returns off-exchange (dark pool) trading activity for one ticker, bucketed over time. Each bucket carries `notionalValue`, `size` (share count), `tradeCount`, and the underlying `stockPrice`. Use it to track dark-venue accumulation or distribution as the session unfolds.
-```python
+Dark Flow returns off-exchange activity for one ticker, bucketed over time.
 
-```
-
-### [Dark Pool Levels](https://quantdata.us/api/docs/endpoints/dark-pool-levels)
-
-Dark Pool Levels returns off-exchange print activity for one ticker, aggregated by price level over a date range. Each level carries the total notional, share count, and trade count of dark-venue prints at that price.
 ```python
 from QuantDataAPI import QuantDataAPI_Client
 
-client = QuantDataAPI_Client("YOUR_API_KEY", output_type="Polars")
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+dark_flow = client.get_dark_flow(
+    "AAPL",
+    sessionDate="2026-05-13",
+    aggregationPeriod="5m",
+)
+```
 
+DataFrame columns: `timestamp`, `notionalValue`, `size`, `stockPrice`, `tradeCount`.
+
+### [Dark Pool Levels](https://quantdata.us/api/docs/endpoints/dark-pool-levels)
+
+Dark Pool Levels aggregates off-exchange prints by price level over a date range.
+
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
 levels = client.get_dark_pool_levels(
     ticker="AAPL",
     startDate="2026-07-05",
 )
 ```
 
-Pandas and Polars output contains `priceLevel`, `notionalValue`, `size`, `tradeCount`, and
-`latestStockPrice`. When `endDate` is omitted, QuantData returns sessions from `startDate` through today.
+DataFrame columns: `priceLevel`, `notionalValue`, `size`, `tradeCount`, `latestStockPrice`. When `endDate` is omitted, the request covers `startDate` through today.
 
 ### [Equity Prints](https://quantdata.us/api/docs/endpoints/equity-prints)
 
-Equity Prints returns the trade-by-trade equity tape across both lit and dark venues. Each row is one print. Rows are paginated with cursor semantics, and every projectable field is returned by default. Use this when you need per-print visibility into how an equity is trading; for aggregated dark-venue activity over time, see Dark Flow.
-```python
+Equity Prints returns the trade-by-trade equity tape across lit and dark venues.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="json")
+first_page = client.get_equity_prints(
+    sessionDate="2026-05-13",
+    tickers=["AAPL"],
+    size=100,
+    sortField="tradeTime",
+    sortDirection="DESCENDING",
+)
+
+cursor = first_page.get("nextSearchAfter")
+if cursor is not None:
+    second_page = client.get_equity_prints(
+        sessionDate="2026-05-13",       # keep the query unchanged
+        tickers=["AAPL"],
+        size=100,
+        sortField="tradeTime",
+        sortDirection="DESCENDING",
+        searchAfter=cursor,              # cursor from the first page
+    )
 ```
+
+**JSON only**: returns one page with `data` and optional `nextSearchAfter`. Pass that cursor as `searchAfter` in a new call to fetch the next page. Page size is 1–100.
 
 ### [Exchange Notifications](https://quantdata.us/api/docs/endpoints/exchange-notifications)
 
-Exchange Notifications returns paginated trade-halt, IPO, regulatory-event, and circuit-breaker notification records over a session or custom time window.
-```python
+Exchange Notifications returns trade-halt, IPO, regulatory-event, and circuit-breaker records.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="json")
+page = client.get_exchange_notifications(
+    sessionDate="2026-05-13",
+    tickers=["AAPL"],
+    types=["LUDP"],
+    size=50,
+)
 ```
+
+**JSON only**: returns one page with `data` and optional `nextSearchAfter`. Pass that cursor as `searchAfter` in a new call to fetch the next page. Page size is 1–100.
 
 ### [Market Map](https://quantdata.us/api/docs/endpoints/market-map)
 
-Market Map returns a market-wide snapshot of every supported ticker with its current and previous session prices, company name, sector, industry, and market capitalization. Suited for treemap-style visualizations of the whole equity universe in one request.
-```python
+Market Map returns a market-wide ticker snapshot for treemap-style analysis.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="pandas")
+market = client.get_market_map(
+    sessionDate="2026-05-13",
+    sectors=["Technology"],
+)
 ```
+
+DataFrame columns: `ticker`, `companyName`, `currentValue`, `industry`, `previousValue`, `sector`, `size`.
 
 ### [Stock Price Over Time](https://quantdata.us/api/docs/endpoints/stock-price-over-time)
 
-Stock Price Over Time returns OHLC bars for the underlying equity, bucketed over time. Each bucket carries `openPrice`, `highPrice`, `lowPrice`, and `closePrice`. There is no volume field on this endpoint.
-```python
+Stock Price Over Time returns underlying-equity OHLC bars; this endpoint has no volume field.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+bars = client.get_stock_price_over_time(
+    "AAPL",
+    sessionDate="2026-05-13",
+    aggregationPeriod="5m",
+)
 ```
+
+DataFrame columns: `timestamp`, `openPrice`, `highPrice`, `lowPrice`, `closePrice`.
 
 ## Options Endpoints
 
 ### [Contract Statistics](https://quantdata.us/api/docs/endpoints/contract-statistics)
 
-Contract Statistics returns a call vs put rollup of total premium, trade count, and contract volume for the requested window. Two entries in the response: one keyed by `CALL`, one by `PUT`. Contract types with no matching trades are omitted.
-```python
+Contract Statistics returns call-versus-put premium, trade-count, and volume totals.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+statistics = client.get_contract_statistics(
+    sessionDate="2026-05-13",
+    ticker="AAPL",
+)
 ```
+
+DataFrame columns: `contractType`, `premium`, `tradeCount`, `volume`.
 
 ### [Contract Trade Side Statistics](https://quantdata.us/api/docs/endpoints/contract-trade-side-statistics)
 
-Contract Trade Side Statistics returns one aggregate per (contract type, trade side) cell. The metric in each cell is selected by `dataMode`: `PREMIUM`, `TRADE_COUNT`, or `VOLUME`. Trade-side keys on the wire are `ABOVE_ASK`, `ASK`, `MID_MARKET`, `BID`, `BELOW_BID`; the short codes `AA`, `A`, `M`, `B`, `BB` are accepted as input aliases on filters but never appear in responses.
-```python
+Contract Trade Side Statistics returns one selected metric per contract-type/trade-side cell.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="pandas")
+statistics = client.get_contract_trade_side_statistics(
+    dataMode= "PREMIUM",
+    sessionDate="2026-05-13",
+    ticker="AAPL",
+)
 ```
+
+DataFrame columns: `contractType`, `tradeSide`, `dataMode`, `value`. `dataMode` accepts `PREMIUM`, `TRADE_COUNT`, or `VOLUME`.
 
 ### [Exposure By Expiration](https://quantdata.us/api/docs/endpoints/exposure-by-expiration)
 
-Exposure By Expiration returns Greek-weighted exposure rolled up by expiration date for one ticker at a snapshot in time. The response shape matches Exposure By Strike; the two endpoints differ in the underlying aggregation strategy, not the wire contract.
-```python
+Exposure By Expiration returns Greek-weighted exposure for one ticker at a session or snapshot.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+exposure = client.get_exposure_by_expiration(
+    ticker = "AAPL",
+    greekMode= "DELTA",
+    representationMode= "RAW",
+    sessionDate="2026-05-13",
+)
 ```
+
+DataFrame columns: `ticker`, `expirationDate`, `strikePrice`, `callExposure`, `putExposure`, `stockPrice`.
 
 ### [Exposure By Strike](https://quantdata.us/api/docs/endpoints/exposure-by-strike)
 
-Exposure By Strike returns Greek-weighted exposure aggregated by expiration and strike for one ticker at a snapshot in time. Each cell carries `callExposure` and `putExposure` in the units implied by `greekMode` and `representationMode`.
-```python
+Exposure By Strike returns Greek-weighted exposure aggregated by expiration and strike.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+exposure = client.get_exposure_by_strike(
+    ticker = "AAPL",
+    greekMode= "DELTA",
+    representationMode= "RAW",
+    sessionDate="2026-05-13",
+    expirationDate="2026-05-16",
+)
 ```
+
+DataFrame columns: `ticker`, `expirationDate`, `strikePrice`, `callExposure`, `putExposure`, `stockPrice`.
 
 ### [Gainers / Losers](https://quantdata.us/api/docs/endpoints/gainers-losers)
 
-Gainers / Losers returns one entry per ticker for the requested window, summarizing call vs put premium and trade activity. Each entry carries `bullishPremium`, `bearishPremium`, total `premium`, `premiumRatio` (bearish over bullish), `tradeCount`, and `volume`.
-```python
+Gainers / Losers summarizes bullish and bearish options activity by ticker.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="pandas")
+movers = client.get_gainers_losers(
+    sessionDate="2026-05-13",
+    tickers=["AAPL", "NVDA"],
+)
 ```
+
+DataFrame columns: `ticker`, `bearishPremium`, `bullishPremium`, `premium`, `premiumRatio`, `tradeCount`, `volume`.
 
 ### [Heat Map](https://quantdata.us/api/docs/endpoints/heat-map)
 
-Heat Map returns an expiration by strike grid for one ticker at a snapshot in time. The metric in each cell is selected by `dataMode`. The response is polymorphic: net / aggregate modes return one value per leg per cell; per-leg modes return a single value per cell. A top-level `type` field advertises which shape was returned.
-```python
+Heat Map returns an expiration-by-strike grid whose shape depends on `dataMode`.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+heat_map = client.get_heat_map(
+    "AAPL",
+    "NET_DELTA_EXPOSURE",
+    sessionDate="2026-05-13",
+)
 ```
+
+DataFrame columns: contract-shaped modes use `type`, `expirationDate`, `strikePrice`, `callValue`, `putValue`; single-leg modes use `type`, `expirationDate`, `strikePrice`, `value`. The top-level response `type` selects the schema.
 
 ### [Interval Map](https://quantdata.us/api/docs/endpoints/interval-map)
 
-Interval Map returns Greek-weighted exposure for one ticker, bucketed over time. Each bucket is a nested grid: expiration date `->` strike (dollars) `->` contract type (`CALL` / `PUT`) `->` exposure aggregate. Use it to watch how positioning shifts across the chain as the session unfolds.
-```python
+Interval Map returns Greek exposure by time bucket, expiration, strike, and contract type.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+intervals = client.get_interval_map(
+    "SPY",
+    "GAMMA",
+    sessionDate="2026-05-13",
+    aggregationPeriod="5m",
+)
 ```
+
+DataFrame columns: `timestamp`, `expirationDate`, `strikePrice`, `contractType`, `exposure`.
 
 ### [IV Rank](https://quantdata.us/api/docs/endpoints/iv-rank)
 
-IV Rank returns per-session-date implied-volatility context for one ticker, looking back over a window you control. For each session, the response gives the last IV, the window min, and the window max for both call and put legs. Compute rank as `(lastIv - windowMinIv) / (windowMaxIv - windowMinIv)` for the leg of interest.
-```python
+IV Rank returns per-session implied-volatility context over a requested lookback and maturity.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="pandas")
+iv_context = client.get_iv_rank(
+    "AAPL",
+    lookBackPeriod=252,
+    maturity=30,
+    contractTypes=["CALL", "PUT"],
+)
 ```
+
+DataFrame columns: `sessionDate`, `contractType`, `lastIv`, `windowMinIv`, `windowMaxIv`, `expirationDate`, `stockPrice`.
 
 ### [Market Share](https://quantdata.us/api/docs/endpoints/market-share)
 
-Market Share returns one entry per exchange, summarizing options activity in three buckets: equity calls, equity puts, and index. For each bucket the response carries premium, trade count, and contract volume. Exchanges with no matching trades are omitted.
-```python
+Market Share summarizes equity-call, equity-put, and index options activity by exchange.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+share = client.get_market_share(
+    sessionDate="2026-05-13",
+    tickers=["AAPL"],
+)
 ```
+
+DataFrame columns: `exchange`, `equityCallPremium`, `equityCallTradeCount`, `equityCallVolume`, `equityPutPremium`, `equityPutTradeCount`, `equityPutVolume`, `indexPremium`, `indexTradeCount`, `indexVolume`.
 
 ### [Max Pain](https://quantdata.us/api/docs/endpoints/max-pain)
 
-Max Pain returns the per-strike call and put intrinsic-value grid for a single ticker and expiration on one trading session, plus the strike that maximizes total writer-side intrinsic value (the max-pain strike) and the underlying stock price.
-```python
+Max Pain returns intrinsic values by strike plus the max-pain strike and stock price.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="pandas")
+max_pain = client.get_max_pain(
+    "AAPL",
+    "2026-05-16",
+    sessionDate="2026-05-13",
+)
 ```
+
+DataFrame columns: `strikePrice`, `callIntrinsicValue`, `putIntrinsicValue`, `maxPainStrikePrice`, `stockPrice`.
 
 ### [Max Pain Over Time](https://quantdata.us/api/docs/endpoints/max-pain-over-time)
 
-Max Pain Over Time returns the max-pain strike for each option expiration on a single trading session. The "over time" dimension is expiration date, not intra-session time: you get one max-pain strike per expiration in the chain.
-```python
+Max Pain Over Time returns one max-pain strike per expiration for a session.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+series = client.get_max_pain_over_time(
+    "AAPL",
+    sessionDate="2026-05-13",
+)
 ```
+
+DataFrame columns: `expirationDate`, `maxPainStrikePrice`.
 
 ### [Net Drift](https://quantdata.us/api/docs/endpoints/net-drift)
 
-Net Drift returns call vs put premium for a slice of the options chain, bucketed over time. Each bucket summarizes the trades that landed in that window: `netCallPremium`, `netCallVolume`, `netPutPremium`, `netPutVolume`, and the mid-market premium for both legs. When the filter narrows to a single ticker the response also includes the underlying `stockPrice` per bucket.
-```python
+Net Drift returns call-versus-put premium and volume measures bucketed over time.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+drift = client.get_net_drift(
+    sessionDate="2026-05-13",
+    aggregationPeriod="5m",
+    ticker="AAPL",
+)
 ```
+
+DataFrame columns: `timestamp`, `midMarketCallPremium`, `midMarketPutPremium`, `netCallPremium`, `netCallVolume`, `netPutPremium`, `netPutVolume`, `stockPrice`.
 
 ### [Net Flow](https://quantdata.us/api/docs/endpoints/net-flow)
 
-Net Flow returns aggregated call and put magnitude for a slice of the options chain, bucketed over time. The metric is selected by `dataMode`: `NET_PREMIUM` (cents) or `NET_VOLUME` (contracts). Each bucket carries `callSum`, `putSum`, and the underlying `stockPrice` when the request narrows to a single ticker.
-```python
+Net Flow returns the selected call and put magnitude bucketed over time.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="pandas")
+flow = client.get_net_flow(
+    "NET_PREMIUM",
+    sessionDate="2026-05-13",
+    aggregationPeriod="5m",
+    ticker="AAPL",
+)
 ```
+
+DataFrame columns: `timestamp`, `callSum`, `putSum`, `stockPrice`. `dataMode` accepts `NET_PREMIUM` or `NET_VOLUME`.
 
 ### [Open Interest By Expiration](https://quantdata.us/api/docs/endpoints/open-interest-by-expiration)
 
-Open Interest By Expiration returns the per-expiration call and put open-interest snapshot for one ticker on a single trading session.
-```python
+Open Interest By Expiration returns call and put open interest for each expiration.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+open_interest = client.get_open_interest_by_expiration(
+    "AAPL",
+    sessionDate="2026-05-13",
+)
 ```
+
+DataFrame columns: `expirationDate`, `callOpenInterest`, `putOpenInterest`.
 
 ### [Open Interest By Strike](https://quantdata.us/api/docs/endpoints/open-interest-by-strike)
 
-Open Interest By Strike returns the per-strike call and put open-interest snapshot for one ticker on a single trading session.
-```python
+Open Interest By Strike returns call and put open interest for each strike.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+open_interest = client.get_open_interest_by_strike(
+    "AAPL",
+    sessionDate="2026-05-13",
+    expirationDate="2026-05-16",
+)
 ```
+
+DataFrame columns: `strikePrice`, `callOpenInterest`, `putOpenInterest`.
 
 ### [Open Interest Change](https://quantdata.us/api/docs/endpoints/open-interest-change)
 
-Open Interest Change returns a paginated, sortable, projectable table of per-contract daily open-interest delta records for a single trading session. Each row carries previous OI, current OI, the signed delta, and the fractional percent change.
-```python
+Open Interest Change returns per-contract daily open-interest deltas for one session.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="json")
+page = client.get_open_interest_change(
+    sessionDate="2026-05-13",
+    tickers=["AAPL"],
+    size=100,
+    sortField="changeInOpenInterest",
+    sortDirection="DESCENDING",
+)
 ```
+
+**JSON only**: returns one page with `data` and optional `nextSearchAfter`. Pass that cursor as `searchAfter` in a new call to fetch the next page. Page size is 1–100.
 
 ### [Open Interest Over Time](https://quantdata.us/api/docs/endpoints/open-interest-over-time)
 
-Open Interest Over Time returns the per-session call and put open-interest series for one ticker across every trading session with available data. There is no time-selection field on the request: the response inherently spans the full available history.
-```python
+Open Interest Over Time returns the full available per-session open-interest history; it has no time selector.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="pandas")
+history = client.get_open_interest_over_time(
+    "AAPL",
+    expirationDate="2026-05-16",
+    strikePrice=220.0,
+)
 ```
+
+DataFrame columns: `sessionDate`, `callOpenInterest`, `putOpenInterest`.
 
 ### [Option Price Over Time](https://quantdata.us/api/docs/endpoints/option-price-over-time)
 
-Option Price Over Time returns OHLC and volume bars for a single options contract, bucketed over time. Each bucket carries `openPrice`, `highPrice`, `lowPrice`, `closePrice`, and `volume`.
-```python
+Option Price Over Time returns OHLCV bars for one option contract.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+bars = client.get_option_price_over_time(
+    osi="AAPL260516C00220000",
+    sessionDate="2026-05-13",
+    aggregationPeriod="5m",
+)
 ```
+
+DataFrame columns: `timestamp`, `openPrice`, `highPrice`, `lowPrice`, `closePrice`, `volume`. Identify the contract with `osi`, or provide the complete `ticker` + `expirationDate` + `strikePrice` + `contractType` set; the two selector forms are mutually exclusive.
 
 ### [Order Flow Consolidated](https://quantdata.us/api/docs/endpoints/order-flow-consolidated)
 
-Order Flow Consolidated returns per-row consolidated option trades: blocks, splits, sweeps, and (when requested) their comprising trades. Rows are paginated with cursor semantics, and every projectable field is returned by default. Use this when you want per-trade visibility into how the tape is grouped.
-```python
+Order Flow Consolidated returns blocks, splits, sweeps, and optionally their comprising trades.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="json")
+page = client.get_order_flow_consolidated(
+    sessionDate="2026-05-13",
+    ticker="AAPL",
+    tradeConsolidationTypes=["SWEEP"],
+    includeComprisingTrades=True,
+    includeStatistics=True,
+    size=100,
+)
 ```
+
+**JSON only**: returns one page with `data`, optional first-page `statistics`, and optional `nextSearchAfter`. Pass that cursor as `searchAfter` in a new call to fetch the next page. Page size is 1–100.
 
 ### [Order Flow Unconsolidated](https://quantdata.us/api/docs/endpoints/order-flow-unconsolidated)
 
-Order Flow Unconsolidated returns the raw, trade-by-trade option tape with no consolidation. Each row is one print. Rows are paginated with cursor semantics, and every projectable field is returned by default. Use this when you need per-print visibility instead of grouped blocks / sweeps.
-```python
+Order Flow Unconsolidated returns the raw option tape, one row per print.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="json")
+page = client.get_order_flow_unconsolidated(
+    sessionDate="2026-05-13",
+    osi="AAPL260516C00220000",
+    includeStatistics=True,
+    size=1000,
+)
 ```
+
+**JSON only**: returns one page with `data`, optional first-page `statistics`, and optional `nextSearchAfter`. Pass that cursor as `searchAfter` in a new call to fetch the next page. Page size is 1–1000. Consolidated-only filters such as `isGoldenSweep` and `tradeConsolidationTypes` are rejected.
 
 ### [Term Structure](https://quantdata.us/api/docs/endpoints/term-structure)
 
-Term Structure returns delta, implied volatility, and moneyness for one ticker at a snapshot in time. The response walks expiration date `->` strike (dollars) `->` contract type, so you can index any cell by `(expiration, strike, CALL | PUT)`.
-```python
+Term Structure returns delta, implied volatility, and moneyness by expiration, strike, and contract type.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+term_structure = client.get_term_structure(
+    "AAPL",
+    sessionDate="2026-05-13",
+    moneyTypes=["OTM"],
+)
 ```
+
+DataFrame columns: `expirationDate`, `strikePrice`, `contractType`, `delta`, `iv`, `moneyType`, `stockPrice`.
 
 ### [Volatility Drift](https://quantdata.us/api/docs/endpoints/volatility-drift)
 
-Volatility Drift returns realized and at-the-money implied volatility for one ticker, in fixed 1-minute buckets across a single trading session. Each bucket carries `arv` (adjusted realized volatility), `iv` (implied volatility from the nearest ATM trade), and the underlying `stockPrice`. Both `arv` and `iv` are fractional, where `0.25` means 25%.
-```python
+Volatility Drift returns 1-minute realized and at-the-money implied volatility for one session.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="pandas")
+volatility = client.get_volatility_drift(
+    "AAPL",
+    sessionDate="2026-05-13",
+)
 ```
+
+DataFrame columns: `timestamp`, `arv`, `iv`, `stockPrice`.
 
 ### [Volatility Skew](https://quantdata.us/api/docs/endpoints/volatility-skew)
 
-Volatility Skew returns the implied-volatility surface for one ticker at a snapshot in time. The response walks expiration date `->` strike (dollars) `->`contract type, where the leaf is the contract's fractional implied volatility.
-```python
+Volatility Skew returns implied volatility by expiration, strike, and contract type.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="polars")
+skew = client.get_volatility_skew(
+    "AAPL",
+    sessionDate="2026-05-13",
+    contractTypes=["CALL", "PUT"],
+)
 ```
+
+DataFrame columns: `expirationDate`, `strikePrice`, `contractType`, `impliedVolatility`, `stockPrice`.
 
 ## News
 
 ### [News Articles](https://quantdata.us/api/docs/endpoints/news-articles)
 
-News Articles returns a paginated, cursor-pageable list of news articles tagged with tickers, topics, and per-ticker sentiment. The article body is opt-in via `includeBody: true` so default responses stay light.
-```python
+News Articles returns articles tagged with topics, tickers, and per-ticker sentiment.
 
+```python
+from QuantDataAPI import QuantDataAPI_Client
+
+client = QuantDataAPI_Client("YOUR_API_KEY", output_type="json")
+page = client.get_news_articles(
+    startTime="2026-05-13 09:30",
+    endTime="2026-05-13 20:00",
+    tickers=["AAPL", "NVDA"],
+    topics=["EARNINGS_BEATS"],
+    includeBody=True,
+    size=50,
+)
 ```
+
+**JSON only**: returns one page with `data` and optional `nextSearchAfter`. Pass that cursor as `searchAfter` in a new call to fetch the next page. Page size is 1–100; results are always ordered by `publishedTime` descending and no sort field is accepted.

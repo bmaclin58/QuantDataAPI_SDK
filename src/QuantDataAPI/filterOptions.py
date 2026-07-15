@@ -1,11 +1,82 @@
-from typing import Any, Mapping, Sequence
-from datetime import date, datetime, timedelta, timezone
+from typing import Any, Mapping, Sequence, TypedDict
+from datetime import date, datetime
 
-from QuantDataAPI.utility import clean_dict, to_quantdata_date, CONTRACT_TYPES, to_quantdata_utc_instant, \
-    SORT_DIRECTIONS
+from QuantDataAPI.utility import clean_dict, to_quantdata_date, CONTRACT_TYPES, SORT_DIRECTIONS
 from QuantDataAPI.validationChecks import validate_enum, validate_enum_sequence
 
 JsonObject = dict[str, Any]
+
+
+class OptionTradeFilters(TypedDict, total=False):
+    """Keyword filter surface shared by the two order-flow endpoints."""
+
+    ticker: str
+    tickers: Sequence[str]
+    sectors: Sequence[str]
+    industries: Sequence[str]
+    exchanges: Sequence[str]
+    expirationDate: date | datetime | str
+    expirationDates: Sequence[str]
+    expirationDateRange: Mapping[str, Any]
+    dte: int | float
+    dteRange: Mapping[str, Any]
+    contractType: str
+    contractTypes: Sequence[str]
+    osi: str
+    strikePrice: int | float
+    strikePrices: Sequence[int | float]
+    strikePriceRange: Mapping[str, Any]
+    stockPriceRange: Mapping[str, Any]
+    askPriceRange: Mapping[str, Any]
+    bidPriceRange: Mapping[str, Any]
+    bidAskSpreadRange: Mapping[str, Any]
+    optionPriceRange: Mapping[str, Any]
+    premiumRange: Mapping[str, Any]
+    sizeRange: Mapping[str, Any]
+    volumeRange: Mapping[str, Any]
+    openInterestRange: Mapping[str, Any]
+    impliedVolatilityRange: Mapping[str, Any]
+    moneynessInDollarsRange: Mapping[str, Any]
+    moneynessInPercentRange: Mapping[str, Any]
+    moneyType: str
+    moneyTypes: Sequence[str]
+    sentiment: str
+    sentimentTypes: Sequence[str]
+    tradeSideCode: str
+    tradeSideCodes: Sequence[str]
+    tradeTypes: Sequence[str]
+    tradeTimeRange: Mapping[str, Any]
+    tradeConsolidationTypes: Sequence[str]
+    isEtf: bool
+    isIndex: bool
+    isOpeningPosition: bool
+    isUnusual: bool
+    isVolumeGreaterThanOpenInterest: bool
+    isCancelled: bool
+    isComplex: bool
+    isComplexToComplex: bool
+    isElectronicCross: bool
+    isFloor: bool
+    isLegging: bool
+    isPriceImprovement: bool
+    isSimpleToSimple: bool
+    isTied: bool
+    isGoldenSweep: bool
+    deltaRange: Mapping[str, Any]
+    gammaRange: Mapping[str, Any]
+    thetaRange: Mapping[str, Any]
+    vegaRange: Mapping[str, Any]
+    rhoRange: Mapping[str, Any]
+    charmRange: Mapping[str, Any]
+    colorRange: Mapping[str, Any]
+    speedRange: Mapping[str, Any]
+    vannaRange: Mapping[str, Any]
+    vommaRange: Mapping[str, Any]
+    vetaRange: Mapping[str, Any]
+    omegaRange: Mapping[str, Any]
+    sigmaRange: Mapping[str, Any]
+    ultimaRange: Mapping[str, Any]
+    zommaRange: Mapping[str, Any]
 
 def add_filter(params: JsonObject, **filters: Any) -> None:
     values = clean_dict(filters)
@@ -191,8 +262,8 @@ def add_session_or_time_range(
             if endTime <= startTime:
                 raise ValueError("endTime must be after startTime.")
         params["timeRange"] = {
-            "startTime": to_quantdata_utc_instant(startTime),
-            "endTime": to_quantdata_utc_instant(endTime),
+            "startTime": startTime,
+            "endTime": endTime,
         }
     elif sessionDate is not None:
         params["sessionDate"] = to_quantdata_date(sessionDate)
@@ -207,7 +278,7 @@ def add_session_or_snapshot(
     if sessionDate is not None and snapshotTime is not None:
         raise ValueError("sessionDate and snapshotTime are mutually exclusive.")
     if snapshotTime is not None:
-        params["snapshotTime"] = to_quantdata_utc_instant(snapshotTime)
+        params["snapshotTime"] = snapshotTime
     elif sessionDate is not None:
         params["sessionDate"] = to_quantdata_date(sessionDate)
 
@@ -250,9 +321,11 @@ def add_pagination(
     max_size: int = 100,
 ) -> None:
     if size is not None:
-        if not 1 <= int(size) <= max_size:
+        if type(size) is not int:
+            raise TypeError("size must be an integer.")
+        if not 1 <= size <= max_size:
             raise ValueError(f"size must be between 1 and {max_size}.")
-        params["size"] = int(size)
+        params["size"] = size
     if searchAfter is not None:
         params["searchAfter"] = list(searchAfter)
     if sortField is not None or sortDirection is not None:
