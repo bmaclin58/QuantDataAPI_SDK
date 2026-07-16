@@ -1,4 +1,4 @@
-# QuantData.US Python SDK (Unofficial)
+# QuantData.US Python SDK (Unofficial) !WIP!
 
 Unofficial Python client for the [QuantData.US API](https://quantdata.us/api).
 
