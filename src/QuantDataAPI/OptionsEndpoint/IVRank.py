@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Mapping, Sequence
 
 from QuantDataAPI.errors import QuantDataClientError
@@ -19,7 +20,7 @@ IV_RANK_SCHEMA = {
     "lastIv": float,
     "windowMinIv": float,
     "windowMaxIv": float,
-    "expirationDate": str,
+    "expirationDate": date,
     "stockPrice": float,
 }
 
@@ -80,7 +81,7 @@ def normalize_iv_rank(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
                         "lastIv": _as_float(cell["lastIv"]),
                         "windowMinIv": _as_float(cell["windowMinIv"]),
                         "windowMaxIv": _as_float(cell["windowMaxIv"]),
-                        "expirationDate": expiration,
+                        "expirationDate": date.fromisoformat(expiration),
                         "stockPrice": stock_price,
                     }
                 )

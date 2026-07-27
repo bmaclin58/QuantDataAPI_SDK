@@ -16,14 +16,14 @@ from QuantDataAPI.validationChecks import validate_enum, validate_non_empty_stri
 
 HEAT_MAP_CONTRACT_SCHEMA = {
     "type": str,
-    "expirationDate": str,
+    "expirationDate": date,
     "strikePrice": float,
     "callValue": float,
     "putValue": float,
 }
 HEAT_MAP_SINGLE_SCHEMA = {
     "type": str,
-    "expirationDate": str,
+    "expirationDate": date,
     "strikePrice": float,
     "value": float,
 }
@@ -93,7 +93,7 @@ def normalize_heat_map(
                     raise TypeError("strike cells must be objects")
                 row = {
                     "type": response_type,
-                    "expirationDate": expiration,
+                    "expirationDate": date.fromisoformat(expiration),
                     "strikePrice": _as_float(strike),
                 }
                 if response_type == "contract":

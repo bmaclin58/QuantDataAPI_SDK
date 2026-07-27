@@ -16,7 +16,7 @@ from QuantDataAPI.validationChecks import validate_enum, validate_non_empty_stri
 
 EXPOSURE_BY_EXPIRATION_SCHEMA = {
     "ticker": str,
-    "expirationDate": str,
+    "expirationDate": date,
     "strikePrice": float,
     "callExposure": float,
     "putExposure": float,
@@ -90,7 +90,7 @@ def normalize_exposure_by_expiration(
                     rows.append(
                         {
                             "ticker": ticker,
-                            "expirationDate": expiration,
+                            "expirationDate": date.fromisoformat(expiration),
                             "strikePrice": _as_float(strike),
                             "callExposure": (
                                 _as_float(call_exposure)

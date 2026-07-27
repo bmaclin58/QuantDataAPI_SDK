@@ -226,7 +226,7 @@ class QuantDataAPI_Client:
 
     def __init__(
         self,
-        api_key: str,
+        api_key,
         *,
         output_type: str = "json",
         timezone: str = "America/New_York",
@@ -396,7 +396,13 @@ class QuantDataAPI_Client:
                 converted_rows,
                 columns=list(schema) if schema is not None else None,
             )
-            return frame.astype(schema) if schema is not None else frame
+            if schema is None:
+                return frame
+            pandas_schema = {
+                name: "datetime64[ns]" if dtype is date else dtype
+                for name, dtype in schema.items()
+            }
+            return frame.astype(pandas_schema)
 
         return pl.DataFrame(converted_rows, schema=schema)
 

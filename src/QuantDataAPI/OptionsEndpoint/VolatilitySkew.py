@@ -14,7 +14,7 @@ from QuantDataAPI.validationChecks import (
 )
 
 VOLATILITY_SKEW_SCHEMA = {
-    "expirationDate": str,
+    "expirationDate": date,
     "strikePrice": float,
     "contractType": str,
     "impliedVolatility": float,
@@ -79,7 +79,7 @@ def normalize_volatility_skew(
                         raise TypeError("contract type must be CALL or PUT")
                     rows.append(
                         {
-                            "expirationDate": expiration,
+                            "expirationDate": date.fromisoformat(expiration),
                             "strikePrice": _as_float(strike),
                             "contractType": contract_type,
                             "impliedVolatility": _as_float(implied_volatility),

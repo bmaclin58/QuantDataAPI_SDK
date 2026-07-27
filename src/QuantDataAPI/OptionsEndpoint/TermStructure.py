@@ -11,7 +11,7 @@ from QuantDataAPI.utility import CONTRACT_TYPES, _as_float
 from QuantDataAPI.validationChecks import validate_non_empty_string
 
 TERM_STRUCTURE_SCHEMA = {
-    "expirationDate": str,
+    "expirationDate": date,
     "strikePrice": float,
     "contractType": str,
     "delta": float,
@@ -75,7 +75,7 @@ def normalize_term_structure(payload: Mapping[str, Any]) -> list[dict[str, Any]]
                         raise TypeError("moneyType must be a string")
                     rows.append(
                         {
-                            "expirationDate": expiration,
+                            "expirationDate": date.fromisoformat(expiration),
                             "strikePrice": _as_float(strike),
                             "contractType": contract_type,
                             "delta": _as_float(cell["delta"]),

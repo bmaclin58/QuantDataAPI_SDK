@@ -10,7 +10,7 @@ from QuantDataAPI.filterOptions import add_filter, add_session
 from QuantDataAPI.validationChecks import validate_non_empty_string, validate_positive
 
 OPEN_INTEREST_BY_EXPIRATION_SCHEMA = {
-    "expirationDate": str,
+    "expirationDate": date,
     "callOpenInterest": int,
     "putOpenInterest": int,
 }
@@ -51,7 +51,7 @@ def normalize_open_interest_by_expiration(
                 raise TypeError("open-interest values must be integers")
             rows.append(
                 {
-                    "expirationDate": expiration,
+                    "expirationDate": date.fromisoformat(expiration),
                     "callOpenInterest": call_oi,
                     "putOpenInterest": put_oi,
                 }

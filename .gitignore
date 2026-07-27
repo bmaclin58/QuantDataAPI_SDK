@@ -78,9 +78,6 @@ fabric.properties
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
 
-### Example user template template
-### Example user template
-
 # IntelliJ project files
 .idea
 *.iml
@@ -261,3 +258,4 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+!/tests/
