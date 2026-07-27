@@ -20,7 +20,7 @@ from QuantDataAPI.validationChecks import (
 
 INTERVAL_MAP_SCHEMA = {
     "timestamp": int,
-    "expirationDate": str,
+    "expirationDate": date,
     "strikePrice": float,
     "contractType": str,
     "exposure": float,
@@ -90,7 +90,7 @@ def normalize_interval_map(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
                         rows.append(
                             {
                                 "timestamp": int(timestamp),
-                                "expirationDate": expiration,
+                                "expirationDate": date.fromisoformat(expiration),
                                 "strikePrice": _as_float(strike),
                                 "contractType": contract_type,
                                 "exposure": _as_float(exposure),

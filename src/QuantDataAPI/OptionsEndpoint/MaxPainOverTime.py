@@ -11,7 +11,7 @@ from QuantDataAPI.utility import _as_float
 from QuantDataAPI.validationChecks import validate_non_empty_string
 
 MAX_PAIN_OVER_TIME_SCHEMA = {
-    "expirationDate": str,
+    "expirationDate": date,
     "maxPainStrikePrice": float,
 }
 
@@ -38,7 +38,7 @@ def normalize_max_pain_over_time(
             raise TypeError("data must be an object")
         rows = [
             {
-                "expirationDate": expiration,
+                "expirationDate": date.fromisoformat(expiration),
                 "maxPainStrikePrice": _as_float(strike),
             }
             for expiration, strike in data.items()
