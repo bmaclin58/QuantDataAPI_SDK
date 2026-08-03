@@ -4,19 +4,28 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quantdataus-api"
-version = "0.1.0"
+version = "1.0.1"
+description = "Unofficial Python client for the QuantData.US API"
+readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Brian Maclin" }]
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "ipykernel>=7.3.0",
-    "matplotlib>=3.11.1",
     "pandas>=3.0.3",
-    "pandas-stubs~=3.0.3",
     "polars>=1.42.1",
-    "python-dotenv>=1.2.2",
     "requests==2.34.2",
     "urllib3>=2.7.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/bmaclin58/QuantDataAPI_SDK"
+Repository = "https://github.com/bmaclin58/QuantDataAPI_SDK"
+Issues = "https://github.com/bmaclin58/QuantDataAPI_SDK/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/QuantDataAPI"]
@@ -24,20 +33,11 @@ packages = ["src/QuantDataAPI"]
 [tool.hatch.build.targets.sdist]
 # Explicit allowlist — only ship source, README, LICENSE, pyproject. Anything
 # else in the working dir (e.g. .claude/, CLAUDE.md, .env*, dist/, tests/)
-# is excluded so the sdist stays minimal.
+# is excluded so the sdist stays minimal. Hatchling always adds .gitignore.
 support-legacy = false
-include = [
-  "/src/QuantDataAPI",
-  "/README.md",
-  "/LICENSE",
-  "/pyproject.toml",
-]
-exclude = [
-  ".env",
-  ".env.*",
-  ".gitignore",
-  "**/.gitignore",
-  ".vscode",
-  ".idea",
-  "*.local",
+only-include = [
+  "src/QuantDataAPI",
+  "README.md",
+  "LICENSE",
+  "pyproject.toml",
 ]
