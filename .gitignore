@@ -259,3 +259,6 @@ cython_debug/
 #.idea/
 
 !/tests/
+!/src/Research/
+!/.env
+/.env

@@ -29,7 +29,7 @@ data = client.get_dark_pool_levels(
 
 ### Request and timezone rules
 
-`timezone` accepts an [IANA timezone name](https://nodatime.org/TimeZones) and defaults to `America/New_York`. The SDK interprets naive input datetimes in that timezone, sends UTC instants, and converts response timestamps back to that timezone unless `convertTimezone=False`. Datetime inputs accept the human-readable `YYYY-MM-DD HH:MM` format; for example, `2026-05-13 20:00` means 8 PM in the configured timezone. ISO-8601 strings and Python `datetime` values are also supported.
+`timezone` accepts an [IANA timezone name](https://nodatime.org/TimeZones) and defaults to `America/New_York`. The SDK interprets naive input datetimes in that timezone, sends UTC instants, and converts response timestamps back to that timezone unless `convertTimezone=False`. DataFrame outputs whose schema contains `timestamp` retain the raw Unix-millisecond value and add an adjacent, timezone-aware `ConvertedDateTime` column using the native pandas or Polars datetime type; that column uses the configured timezone when conversion is enabled and UTC when it is disabled. Datetime inputs accept the human-readable `YYYY-MM-DD HH:MM` format; for example, `2026-05-13 20:00` means 8 PM in the configured timezone. ISO-8601 strings and Python `datetime` values are also supported.
 
 Where supported, `sessionDate` and the `startTime`/`endTime` pair are mutually exclusive. Both time bounds are required together. Session or snapshot selectors are optional unless an endpoint says otherwise; omitting them asks QuantData for its latest available session or snapshot.
 
@@ -50,7 +50,7 @@ dark_flow = client.get_dark_flow(
 )
 ```
 
-DataFrame columns: `timestamp`, `notionalValue`, `size`, `stockPrice`, `tradeCount`.
+DataFrame columns: `timestamp`, `ConvertedDateTime`, `notionalValue`, `size`, `stockPrice`, `tradeCount`.
 
 ### [Dark Pool Levels](https://quantdata.us/api/docs/endpoints/dark-pool-levels)
 
@@ -147,7 +147,7 @@ bars = client.get_stock_price_over_time(
 )
 ```
 
-DataFrame columns: `timestamp`, `openPrice`, `highPrice`, `lowPrice`, `closePrice`.
+DataFrame columns: `timestamp`, `ConvertedDateTime`, `openPrice`, `highPrice`, `lowPrice`, `closePrice`.
 
 ## Options Endpoints
 
@@ -270,7 +270,7 @@ intervals = client.get_interval_map(
 )
 ```
 
-DataFrame columns: `timestamp`, `expirationDate`, `strikePrice`, `contractType`, `exposure`.
+DataFrame columns: `timestamp`, `ConvertedDateTime`, `expirationDate`, `strikePrice`, `contractType`, `exposure`.
 
 ### [IV Rank](https://quantdata.us/api/docs/endpoints/iv-rank)
 
@@ -354,7 +354,7 @@ drift = client.get_net_drift(
 )
 ```
 
-DataFrame columns: `timestamp`, `midMarketCallPremium`, `midMarketPutPremium`, `netCallPremium`, `netCallVolume`, `netPutPremium`, `netPutVolume`, `stockPrice`.
+DataFrame columns: `timestamp`, `ConvertedDateTime`, `midMarketCallPremium`, `midMarketPutPremium`, `netCallPremium`, `netCallVolume`, `netPutPremium`, `netPutVolume`, `stockPrice`.
 
 ### [Net Flow](https://quantdata.us/api/docs/endpoints/net-flow)
 
@@ -372,7 +372,7 @@ flow = client.get_net_flow(
 )
 ```
 
-DataFrame columns: `timestamp`, `callSum`, `putSum`, `stockPrice`. `dataMode` accepts `NET_PREMIUM` or `NET_VOLUME`.
+DataFrame columns: `timestamp`, `ConvertedDateTime`, `callSum`, `putSum`, `stockPrice`. `dataMode` accepts `NET_PREMIUM` or `NET_VOLUME`.
 
 ### [Open Interest By Expiration](https://quantdata.us/api/docs/endpoints/open-interest-by-expiration)
 
@@ -458,7 +458,7 @@ bars = client.get_option_price_over_time(
 )
 ```
 
-DataFrame columns: `timestamp`, `openPrice`, `highPrice`, `lowPrice`, `closePrice`, `volume`. Identify the contract with `osi`, or provide the complete `ticker` + `expirationDate` + `strikePrice` + `contractType` set; the two selector forms are mutually exclusive.
+DataFrame columns: `timestamp`, `ConvertedDateTime`, `openPrice`, `highPrice`, `lowPrice`, `closePrice`, `volume`. Identify the contract with `osi`, or provide the complete `ticker` + `expirationDate` + `strikePrice` + `contractType` set; the two selector forms are mutually exclusive.
 
 ### [Order Flow Consolidated](https://quantdata.us/api/docs/endpoints/order-flow-consolidated)
 
@@ -529,7 +529,7 @@ volatility = client.get_volatility_drift(
 )
 ```
 
-DataFrame columns: `timestamp`, `arv`, `iv`, `stockPrice`.
+DataFrame columns: `timestamp`, `ConvertedDateTime`, `arv`, `iv`, `stockPrice`.
 
 ### [Volatility Skew](https://quantdata.us/api/docs/endpoints/volatility-skew)
 

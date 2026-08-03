@@ -390,6 +390,8 @@ class QuantDataAPI_Client:
         if self.output_type == "json":
             return self._convert_response_value(payload, for_dataframe=False)
 
+        has_epoch_timestamp = schema is not None and "timestamp" in schema
+        target_timezone = self.timezone if self.convertTimezone else "UTC"
         converted_rows = self._convert_response_value(rows, for_dataframe=True)
         if self.output_type == "pandas":
             frame = pd.DataFrame.from_records(
@@ -402,9 +404,45 @@ class QuantDataAPI_Client:
                 name: "datetime64[ns]" if dtype is date else dtype
                 for name, dtype in schema.items()
             }
-            return frame.astype(pandas_schema)
+            converted_datetime = None
+            if has_epoch_timestamp:
+                try:
+                    converted_datetime = pd.to_datetime(
+                        frame["timestamp"],
+                        unit="ms",
+                        utc=True,
+                    ).dt.tz_convert(target_timezone)
+                except (OverflowError, TypeError, ValueError) as exc:
+                    raise QuantDataClientError(
+                        "timestamp must be valid Unix milliseconds."
+                    ) from exc
+            frame = frame.astype(pandas_schema)
+            if converted_datetime is not None:
+                frame.insert(
+                    frame.columns.get_loc("timestamp") + 1,
+                    "ConvertedDateTime",
+                    converted_datetime,
+                )
+            return frame
 
-        return pl.DataFrame(converted_rows, schema=schema)
+        frame = pl.DataFrame(converted_rows, schema=schema)
+        if has_epoch_timestamp:
+            try:
+                converted_datetime = (
+                    pl.from_epoch(frame["timestamp"], time_unit="ms")
+                    .dt.replace_time_zone("UTC")
+                    .dt.convert_time_zone(target_timezone)
+                    .rename("ConvertedDateTime")
+                )
+            except (OverflowError, ValueError, pl.exceptions.PolarsError) as exc:
+                raise QuantDataClientError(
+                    "timestamp must be valid Unix milliseconds."
+                ) from exc
+            frame.insert_column(
+                frame.get_column_index("timestamp") + 1,
+                converted_datetime,
+            )
+        return frame
 
     def _require_json_output(self, endpoint_name: str) -> None:
         if self.output_type != "json":
