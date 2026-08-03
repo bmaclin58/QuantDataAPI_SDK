@@ -1,4 +1,4 @@
-# QuantData.US Python SDK (Unofficial) !WIP!
+# QuantData.US Python SDK (Unofficial)
 
 Unofficial Python client for the [QuantData.US API](https://quantdata.us/api).
 
@@ -479,6 +479,30 @@ page = client.get_order_flow_consolidated(
 ```
 
 **JSON only**: returns one page with `data`, optional first-page `statistics`, and optional `nextSearchAfter`. Pass that cursor as `searchAfter` in a new call to fetch the next page. Page size is 1–100.
+
+The SDK returns one page per call. To collect every matching row, keep the request unchanged, pass each `nextSearchAfter` value back as `searchAfter`, and stop only when the cursor is `None`:
+
+```python
+request = {
+    "sessionDate": "2026-05-13",
+    "ticker": "AAPL",
+    "expirationDate": "2026-05-13",
+    "sentimentTypes": ["BEARISH"],
+}
+all_rows = []
+search_after = None
+
+while True:
+    page = client.get_order_flow_consolidated(
+        **request,
+        size=100,
+        searchAfter=search_after,
+    )
+    all_rows.extend(page["data"])
+    search_after = page.get("nextSearchAfter")
+    if search_after is None:
+        break
+```
 
 ### [Order Flow Unconsolidated](https://quantdata.us/api/docs/endpoints/order-flow-unconsolidated)
 
