@@ -25,6 +25,25 @@ class QuantDataHttpError(QuantDataClientError):
         headers: dict[str, Any] | None = None,
         problem: dict[str, Any] | None = None,
     ):
+        """Initialize an HTTP error from an RFC 9457 problem response.
+
+        Args:
+            status_code: HTTP response status used when `problem["status"]` is
+                absent.
+            message: Fallback exception message and `detail` value.
+            headers: Response headers; defaults to an empty dictionary.
+            problem: Parsed problem object; defaults to an empty dictionary.
+
+        Returns:
+            None. The instance exposes `status_code`, `headers`, `problem`, and
+            the RFC 9457 `type`, `title`, `status`, `detail`, and `instance`
+            fields. Optional fields are `None` when absent; `type`, `status`,
+            and `detail` use the documented fallbacks above.
+
+        Raises:
+            AttributeError: If `problem` is not a dictionary-like object with
+                a `get` method.
+        """
         super().__init__(message)
         self.status_code = status_code
         self.headers = headers if headers is not None else {}
@@ -42,6 +61,12 @@ class QuantDataValidationError(QuantDataHttpError):
 
     @property
     def errors(self) -> list[dict[str, Any]]:
+        """Expose the problem `errors` extension.
+
+        Returns:
+            Field-level validation errors, or an empty list when `errors` is
+            absent. An explicit JSON null is returned as `None`.
+        """
         return self.problem.get("errors", [])
 
 
@@ -66,6 +91,11 @@ class QuantDataOpraAgreementRequiredError(QuantDataHttpError):
 
     @property
     def agreement_url(self) -> str | None:
+        """Expose the problem `agreementUrl` extension.
+
+        Returns:
+            The OPRA agreement URL, or `None` when the field is absent or null.
+        """
         return self.problem.get("agreementUrl")
 
 
@@ -80,22 +110,51 @@ class QuantDataRateLimitError(QuantDataHttpError):
 
     @property
     def limit(self) -> int | None:
+        """Expose the problem `limit` extension.
+
+        Returns:
+            The sustained request limit, or `None` when the field is absent or
+            null.
+        """
         return self.problem.get("limit")
 
     @property
     def window_seconds(self) -> int | None:
+        """Expose the problem `windowSeconds` extension.
+
+        Returns:
+            The sustained-limit window in seconds, or `None` when the field is
+            absent or null.
+        """
         return self.problem.get("windowSeconds")
 
     @property
     def burst_limit(self) -> int | None:
+        """Expose the problem `burstLimit` extension.
+
+        Returns:
+            The burst request limit, or `None` when the field is absent or null.
+        """
         return self.problem.get("burstLimit")
 
     @property
     def burst_window_seconds(self) -> int | None:
+        """Expose the problem `burstWindowSeconds` extension.
+
+        Returns:
+            The burst-limit window in seconds, or `None` when the field is
+            absent or null.
+        """
         return self.problem.get("burstWindowSeconds")
 
     @property
     def retry_after_seconds(self) -> int | None:
+        """Expose the problem `retryAfterSeconds` extension.
+
+        Returns:
+            The suggested retry delay in seconds, or `None` when the field is
+            absent or null.
+        """
         return self.problem.get("retryAfterSeconds")
 
 
