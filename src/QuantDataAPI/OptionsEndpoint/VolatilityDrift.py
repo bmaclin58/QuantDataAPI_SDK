@@ -51,8 +51,8 @@ def normalize_volatility_drift(
         for timestamp, bucket in data.items():
             if not isinstance(bucket, Mapping):
                 raise TypeError("bucket must be an object")
-            arv = bucket["arv"]
-            iv = bucket["iv"]
+            arv = bucket.get("arv")
+            iv = bucket.get("iv")
             rows.append(
                 {
                     "timestamp": int(timestamp),

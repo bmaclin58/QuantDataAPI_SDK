@@ -152,8 +152,8 @@ OPTION_PRICE_PAYLOAD = {
 
 VOLATILITY_DRIFT_PAYLOAD = {
     "data": {
-        "1747137660000": {"arv": 0.2420, "iv": None, "stockPrice": 213.51},
-        "1747137600000": {"arv": None, "iv": 0.2538, "stockPrice": 213.45},
+        "1747137660000": {"arv": 0.2420, "stockPrice": 213.51},
+        "1747137600000": {"iv": 0.2538, "stockPrice": 213.45},
     }
 }
 
